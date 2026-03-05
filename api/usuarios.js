@@ -1,48 +1,48 @@
-import { sql } from '@vercel/postgres';
+const { Pool } = require('pg');
+
+// Conexión a tu base de datos Neon usando la variable de entorno
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
 
 export default async function handler(req, res) {
-
-  // ==== CORS ====
-  res.setHeader('Access-Control-Allow-Origin', '*'); // permite todos los orígenes
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS'); // métodos permitidos
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  // Manejar preflight
+  // 1. Manejar el Preflight de CORS (OPTIONS)
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // =============================
-  // GET -> obtener usuarios
-  // =============================
+  // 2. GET: Obtener usuarios
   if (req.method === 'GET') {
     try {
-      const { rows } = await sql`
-        SELECT * FROM usuarios
-        ORDER BY id
-      `;
-      res.status(200).json(rows);
+      const { rows } = await pool.query('SELECT * FROM usuarios ORDER BY id ASC');
+      return res.status(200).json(rows);
     } catch (error) {
-      res.status(500).json({ error: "Error al obtener usuarios" });
+      console.error("Error en la BD al hacer GET:", error);
+      // Devolvemos el error exacto para saber qué falla
+      return res.status(500).json({ error: "Fallo en GET", detalle: error.message });
     }
-  }
-
-  // =============================
-  // POST -> crear usuario
-  // =============================
+  } 
+  
+  // 3. POST: Crear usuario
   else if (req.method === 'POST') {
     try {
       const { nombre } = req.body;
-      const result = await sql`
-        INSERT INTO usuarios (nombre)
-        VALUES (${nombre})
-        RETURNING *
-      `;
-      res.status(201).json(result.rows[0]);
+      const { rows } = await pool.query(
+        'INSERT INTO usuarios (nombre) VALUES ($1) RETURNING *',
+        [nombre]
+      );
+      return res.status(201).json(rows[0]);
     } catch (error) {
-      res.status(500).json({ error: "Error al insertar usuario" });
+      console.error("Error en la BD al hacer POST:", error);
+      return res.status(500).json({ error: "Fallo en POST", detalle: error.message });
     }
-  } else {
-    res.status(405).json({ error: "Método no permitido" });
+  } 
+  
+  // Método no soportado
+  else {
+    return res.status(405).json({ error: 'Método no permitido' });
   }
 }
