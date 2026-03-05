@@ -1,6 +1,5 @@
 const { Pool } = require('pg');
 
-// Conexión a tu base de datos Neon usando la variable de entorno
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -8,25 +7,26 @@ const pool = new Pool({
   }
 });
 
-export default async function handler(req, res) {
-  // 1. Manejar el Preflight de CORS (OPTIONS)
+// ESTE ES EL CAMBIO CLAVE: Usamos module.exports
+module.exports = async function handler(req, res) {
+  
+  // 1. Manejar el Preflight de CORS (OPTIONS) para que no devuelva 500
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // 2. GET: Obtener usuarios
+  // 2. Petición GET
   if (req.method === 'GET') {
     try {
       const { rows } = await pool.query('SELECT * FROM usuarios ORDER BY id ASC');
       return res.status(200).json(rows);
     } catch (error) {
-      console.error("Error en la BD al hacer GET:", error);
-      // Devolvemos el error exacto para saber qué falla
-      return res.status(500).json({ error: "Fallo en GET", detalle: error.message });
+      console.error("Error en GET:", error);
+      return res.status(500).json({ error: "Fallo en BD", detalle: error.message });
     }
   } 
   
-  // 3. POST: Crear usuario
+  // 3. Petición POST
   else if (req.method === 'POST') {
     try {
       const { nombre } = req.body;
@@ -36,13 +36,12 @@ export default async function handler(req, res) {
       );
       return res.status(201).json(rows[0]);
     } catch (error) {
-      console.error("Error en la BD al hacer POST:", error);
-      return res.status(500).json({ error: "Fallo en POST", detalle: error.message });
+      console.error("Error en POST:", error);
+      return res.status(500).json({ error: "Fallo en BD", detalle: error.message });
     }
   } 
   
-  // Método no soportado
   else {
     return res.status(405).json({ error: 'Método no permitido' });
   }
-}
+};
